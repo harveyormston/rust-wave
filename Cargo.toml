@@ -1,0 +1,6 @@
+[package]
+name = "wave"
+version = "0.1.0"
+authors = ["Harvey Ormston <htormston@gmail.com>"]
+
+[dependencies]
