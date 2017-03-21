@@ -19,46 +19,51 @@ fn vec_bytes(value: u32, num_bytes: u32) -> Vec<u8> {
     byte_vector
 }
 
-/// # fn create_header(ns: u32, nc: u16, sr: u32, bps: u16) -> Vec<u8> {
-/// #     ns: number of samples
-/// #     nc: number of channels
-/// #     sr: sample rate in Hz
-/// #     bps: bits per sample
-/// # }
-
-fn create_header(ns: u32, nc: u16, sr: u32, bps: u16) -> Vec<u8> {
-
-    let chunk_id = String::from("RIFF");
-    let format = String::from("WAVE");
-    let subchunk_1_id = String::from("fmt ");
-    let subchunk_2_id = String::from("data");
-
-    let subchunk_1_size: u32 = 16;
-    let audio_format: u16 = 1;
-
-    let block_align: u16 = nc * bps / 8;
-    let byte_rate: u32 = sr * (block_align as u32);
-    let subchunk_2_size: u32 = ns * (block_align as u32);
-    let chunk_size: u32 = subchunk_2_size + 36;
-
-    let mut header = vec![];
-
-    header.extend(chunk_id.as_bytes());
-    header.extend(vec_bytes(chunk_size, 4));
-    header.extend(format.as_bytes());
-    header.extend(subchunk_1_id.as_bytes());
-    header.extend(vec_bytes(subchunk_1_size, 4));
-    header.extend(vec_bytes((audio_format as u32), 2));
-    header.extend(vec_bytes((nc as u32), 2));
-    header.extend(vec_bytes(sr, 4));
-    header.extend(vec_bytes(byte_rate, 4));
-    header.extend(vec_bytes((block_align as u32), 2));
-    header.extend(vec_bytes((bps as u32), 2));
-    header.extend(subchunk_2_id.as_bytes());
-    header.extend(vec_bytes(subchunk_2_size, 4));
-
-    header
+struct WavFile {
+    filename: String,
+    nsamples: u32,
+    nchannels: u16,
+    samplerate: u32,
+    bitspersample: u16,
 }
+
+impl WavFile {
+
+    fn header(&self) -> Vec<u8> {
+
+        let chunk_id = String::from("RIFF");
+        let format = String::from("WAVE");
+        let subchunk_1_id = String::from("fmt ");
+        let subchunk_2_id = String::from("data");
+
+        let subchunk_1_size: u32 = 16;
+        let audio_format: u16 = 1;
+
+        let block_align: u16 = self.nchannels * self.bitspersample / 8;
+        let byte_rate: u32 = self.samplerate * (block_align as u32);
+        let subchunk_2_size: u32 = self.nsamples * (block_align as u32);
+        let chunk_size: u32 = subchunk_2_size + 36;
+
+        let mut header = vec![];
+
+        header.extend(chunk_id.as_bytes());
+        header.extend(vec_bytes(chunk_size, 4));
+        header.extend(format.as_bytes());
+        header.extend(subchunk_1_id.as_bytes());
+        header.extend(vec_bytes(subchunk_1_size, 4));
+        header.extend(vec_bytes((audio_format as u32), 2));
+        header.extend(vec_bytes((self.nchannels as u32), 2));
+        header.extend(vec_bytes(self.samplerate, 4));
+        header.extend(vec_bytes(byte_rate, 4));
+        header.extend(vec_bytes((block_align as u32), 2));
+        header.extend(vec_bytes((self.bitspersample as u32), 2));
+        header.extend(subchunk_2_id.as_bytes());
+        header.extend(vec_bytes(subchunk_2_size, 4));
+
+        header
+    }
+}
+
 
 fn main() {
 
@@ -79,16 +84,26 @@ fn main() {
     let sample_scale: f64 = (two.pow((bps as u32) - 1)) as f64;
     let float_scale: f64 = (sample_scale - 1.0) / sample_scale;
 
+    let pitch: f64 = 880.0;
+
     for t in (0 .. sr).map(|x| x as f64 / (sr as f64)) {
-        let sample = (t * 440.0 * 2.0 * PI).sin();
+        let sample = (t * pitch * 2.0 * PI).sin();
         let amplitude: f64 = 1.0;
         let sample = sample * amplitude * float_scale;
         data.push(sample);
     }
 
     let ns = data.len() as u32;
-    let header = create_header(ns, nc, sr, bps);
-    file.write(&header).expect("Couldn't write");
+    let wav = WavFile {
+        filename: String::from("test.wav"),
+        nsamples: ns,
+        nchannels: 1,
+        samplerate: sr,
+        bitspersample: bps,
+    };
+
+    let hdr = wav.header();
+    file.write(&hdr).expect("Couldn't write");
 
     let bytes_per_sample: u32 = (bps as u32) / 8;
 
